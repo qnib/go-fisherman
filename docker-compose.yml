@@ -1,0 +1,15 @@
+version: "3"
+services:
+  http:
+    image: qnib/httpcheck
+    ports:
+     - 8080:8080
+    deploy:
+      replicas: 3
+  fisherman:
+    image: qnib/uplain-golang
+    environment:
+       SKIP_ENTRYPOINTS: "1"
+    volumes:
+       - ${GOPATH}/src/github.com/qnib/go-fisherman:/usr/local/src/github.com/qnib/go-fisherman
+    command: wait.sh
