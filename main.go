@@ -11,26 +11,31 @@ import (
 	"errors"
 	"time"
 	"log"
+	"text/template"
+	"bytes"
+)
+
+var (
+	fishermanTemplates = map[string]string{
+		"etcd": "{{.ServiceName}}.{{.TaskSlot}}.{{.TaskID}}=http://{{.IP}}:2380",
+	}
 )
 
 type TaskInfo struct {
 	ServiceName	string
 	TaskSlot	string
 	TaskID		string
+	IP			string
 	NetworkName	string
+	HostName	string
 }
 
-func resolveTask(ip string) (ti TaskInfo, err error) {
-	addrs, _ := net.LookupAddr(ip)
-	if len(addrs) != 1 {
-		return ti, errors.New(fmt.Sprintf("Could not identify exctly on task for '%s': got %v", ip, addrs))
-	}
-	slice := strings.Split(addrs[0], ".")
-	ti.ServiceName = slice[0]
-	ti.TaskSlot = slice[1]
-	ti.TaskID = slice[2]
-	ti.NetworkName = slice[3]
-	return
+func (t *TaskInfo) String() string {
+	res := []string{}
+	res = append(res, fmt.Sprintf("%-15s : %s", "ServiceName", t.ServiceName))
+	res = append(res, fmt.Sprintf("%-15s : %s", "TaskSlot", t.TaskSlot))
+	res = append(res, fmt.Sprintf("%-15s : %s", "TaskID", t.TaskID))
+	return strings.Join(res, "\n")
 }
 
 type Fisherman struct {
@@ -69,12 +74,27 @@ func (f *Fisherman) Log(level, msg string) {
 	}
 }
 
+func (f *Fisherman) resolveTask(ip string) (ti TaskInfo, err error) {
+	addrs, _ := net.LookupAddr(ip)
+	if len(addrs) == 0 {
+		return ti, errors.New(fmt.Sprintf("Could not identify exctly on task for '%s': got %v", ip, addrs))
+	}
+	slice := strings.Split(addrs[0], ".")
+	ti.IP = ip
+	ti.ServiceName = slice[0]
+	ti.TaskSlot = slice[1]
+	ti.TaskID = slice[2]
+	ti.NetworkName = slice[3]
+	ti.HostName = fmt.Sprintf("%s.%s.%s", ti.ServiceName, ti.TaskSlot, ti.TaskID)
+	f.Log("debug", fmt.Sprintf("Resolved '%s' to '%s'", ip, ti))
+	return
+}
+
 func (f *Fisherman) createHealthCheckOverwrite() {
 	hdir := f.Ctx.String("healthcheck-dir")
 	fpath := fmt.Sprintf("%s/force_true", hdir)
 	if _, err := os.Stat(fpath); err == nil {
 		return
-
 	}
 	w, err := os.Create(fpath)
 	if err != nil {
@@ -84,6 +104,7 @@ func (f *Fisherman) createHealthCheckOverwrite() {
 
 	f.Log("debug", fmt.Sprintf("File '%s' created!", fpath))
 }
+
 func (f *Fisherman) fetchIPs() []string {
 	mintasks := f.Ctx.Int("mintasks")
 	delay := time.Duration(f.Ctx.Int("delay"))*time.Second
@@ -119,20 +140,35 @@ func (f *Fisherman) Run() {
 		os.Exit(1)
 	}
 	res := []string{}
+	printTaskIP := f.Ctx.Bool("print-task-ip")
 	out := f.Ctx.String("out")
-	format := f.Ctx.String("format")
+	tmpl := f.Ctx.String("template")
+	if val, ok := fishermanTemplates[tmpl]; ok {
+		f.Log("debug", fmt.Sprintf("evaluated '%s' to '%s'", tmpl, val))
+		tmpl = val
+
+	}
 	ips := f.fetchIPs()
+	hostname, _ := os.Hostname()
 	for _, ip := range ips {
-		task, _ := resolveTask(ip)
-		switch format {
-		case "ip":
-			res = append(res, ip)
-		case "host=ip":
-			res = append(res, fmt.Sprintf("%s.%s.%s=%s", task.ServiceName, task.TaskSlot, task.TaskID, ip))
-		default:
-			f.Log("error", fmt.Sprintf("Unknon format '%s'", format))
-			os.Exit(1)
+		task, err := f.resolveTask(ip)
+		if printTaskIP && hostname == task.HostName {
+			fmt.Println(task.IP)
+			os.Exit(0)
 		}
+		if err != nil {
+			f.Log("error", err.Error())
+			test, _ := net.LookupAddr(ip)
+			f.Log("debug", strings.Join(test, " "))
+		}
+		f.Log("debug", fmt.Sprintf("Running Template: %s", tmpl))
+		t := template.Must(template.New("tmpl").Parse(tmpl))
+		buf := new(bytes.Buffer)
+		err = t.Execute(buf, task)
+		if err != nil {
+			f.Log("error", fmt.Sprintf("Error during rendering '%s': %s", tmpl, err.Error()))
+		}
+		res = append(res, buf.String())
 	}
 	switch out {
 	case "bash":
@@ -162,11 +198,13 @@ func main() {
 			Name:  "out,o",
 			Value: "bash",
 			Usage: "Output format (only 'bash' or 'list' for now).",
+			EnvVar: "FISHERMAN_OUT",
 		},
 		cli.StringFlag{
-			Name:  "format,f",
-			Value: "ip",
-			Usage: `Item format. (ip: plain ip, host=ip: {{.Service.Name}}.{{.Task.Slot}}.{{.Task.ID}}=ip)`,
+			Name:  "template,t",
+			Value: "{{.IP}}",
+			Usage: "Golang Template. (e.g. '{{.ServiceName}}.{{.TaskSlot}}.{{.TaskID}}={{.IP}}')",
+			EnvVar: "FISHERMAN_TEMPLATE",
 		},
 		cli.IntFlag{
 			Name:  "mintasks",
@@ -190,6 +228,10 @@ func main() {
 			Name:   "healthcheck-overwrite",
 			Usage:  "If set the healthcheck can be overwriten if mintasks is not 0",
 			EnvVar: "ALLOW_HEALTHCHECK_OVERWRITE",
+		},
+		cli.BoolFlag{
+			Name:   "print-task-ip",
+			Usage:  "Prints the IP of the task matching the hostname",
 		},
 		cli.StringFlag{
 			Name:   "log-level",

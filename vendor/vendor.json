@@ -27,12 +27,6 @@
 			"revisionTime": "2017-05-19T02:37:13Z"
 		},
 		{
-			"checksumSHA1": "GYbKxzRieygBeMQuiQlm2ta2X1g=",
-			"path": "github.com/miekg/dns",
-			"revision": "babbdab23ae95cdfbd19b69eb04788c504254bfc",
-			"revisionTime": "2017-05-23T10:21:56Z"
-		},
-		{
 			"checksumSHA1": "m8hYD/alsufIYIM7sR06wbL+dKo=",
 			"path": "github.com/zpatrick/go-config",
 			"revision": "710646a45582fde23bf77bacbc2f38008dc7ffc2",
