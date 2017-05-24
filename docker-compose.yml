@@ -1,9 +1,12 @@
 version: "3"
 services:
   http:
-    image: qnib/httpcheck
+    image: qnib/plain-httpcheck:local12345
     ports:
      - 8080:8080
+    environment:
+       DELAY: "30"
+       SWARM_SERVICE_NAME: "http"
     deploy:
       replicas: 3
   fisherman:
