@@ -1,14 +1,21 @@
 version: "3"
 services:
-  http:
-    image: qnib/plain-httpcheck:local12345
+  etcd:
+    image: qnib/plain-etcd:local5
+    hostname: "{{.Service.Name}}.{{.Task.Slot}}.{{.Task.ID}}"
     ports:
      - 8080:8080
     environment:
        DELAY: "30"
-       SWARM_SERVICE_NAME: "http"
+       ALLOW_HEALTHCHECK_OVERWRITE: "true"
+       FISHERMAN_MIN_TASKS: "3"
+       FISHERMAN_OUT: "list"
+       ETCD_CLUSTER_TOKEN: "etcd-1"
+    volumes:
+       - ${GOPATH}/src/github.com/qnib/go-fisherman:/usr/local/src/github.com/qnib/go-fisherman
     deploy:
       replicas: 3
+    #command: wait.sh
   fisherman:
     image: qnib/uplain-golang
     environment:
@@ -16,3 +23,10 @@ services:
     volumes:
        - ${GOPATH}/src/github.com/qnib/go-fisherman:/usr/local/src/github.com/qnib/go-fisherman
     command: wait.sh
+  afisherman:
+      image: qnib/alplain-golang
+      environment:
+         SKIP_ENTRYPOINTS: "1"
+      volumes:
+         - ${GOPATH}/src/github.com/qnib/go-fisherman:/usr/local/src/github.com/qnib/go-fisherman
+      command: wait.sh
