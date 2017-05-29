@@ -135,12 +135,19 @@ func (f *Fisherman) fetchIPs() []string {
 
 func (f *Fisherman) Run() {
 	srv := f.Ctx.Args().Get(0)
+	res := []string{}
+	printTaskIP := f.Ctx.Bool("print-task-ip")
+	printContainerIP := f.Ctx.Bool("print-container-ip")
+	hostname, _ := os.Hostname()
+	if printContainerIP {
+		ips, _ := net.LookupHost(hostname)
+		fmt.Printf("%s\n", ips[0])
+		os.Exit(0)
+	}
 	if srv == "" {
 		f.Log("error", "please provide service name to look for as an argument.")
 		os.Exit(1)
 	}
-	res := []string{}
-	printTaskIP := f.Ctx.Bool("print-task-ip")
 	out := f.Ctx.String("out")
 	tmpl := f.Ctx.String("template")
 	if val, ok := fishermanTemplates[tmpl]; ok {
@@ -149,7 +156,6 @@ func (f *Fisherman) Run() {
 
 	}
 	ips := f.fetchIPs()
-	hostname, _ := os.Hostname()
 	for _, ip := range ips {
 		task, err := f.resolveTask(ip)
 		if printTaskIP && hostname == task.HostName {
@@ -232,6 +238,10 @@ func main() {
 		cli.BoolFlag{
 			Name:   "print-task-ip",
 			Usage:  "Prints the IP of the task matching the hostname",
+		},
+		cli.BoolFlag{
+			Name:   "print-container-ip",
+			Usage:  "Prints the IP of the container",
 		},
 		cli.StringFlag{
 			Name:   "log-level",
