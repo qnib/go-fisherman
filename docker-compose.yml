@@ -1,7 +1,7 @@
 version: "3"
 services:
   etcd:
-    image: qnib/plain-etcd
+    image: qnib/plain-etcd:dirty2
     hostname: "{{.Service.Name}}.{{.Task.Slot}}.{{.Task.ID}}"
     ports:
      - 8080:8080
@@ -11,11 +11,12 @@ services:
        FISHERMAN_MIN_TASKS: "3"
        FISHERMAN_OUT: "list"
        ETCD_CLUSTER_TOKEN: "etcd-1"
+       SERVICE_NAME: "{{.Service.Name}}"
     deploy:
        replicas: 3
     #volumes:
     #   - ${GOPATH}/src/github.com/qnib/go-fisherman:/usr/local/src/github.com/qnib/go-fisherman
-    #command: wait.sh
+    command: wait.sh
   fisherman:
     image: qnib/uplain-golang
     environment:

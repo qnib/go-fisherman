@@ -18,6 +18,8 @@ import (
 var (
 	fishermanTemplates = map[string]string{
 		"etcd": "{{.ServiceName}}.{{.TaskSlot}}.{{.TaskID}}=http://{{.IP}}:2380",
+		"hostlist": "{{.ServiceName}}.{{.TaskSlot}}.{{.TaskID}}",
+
 	}
 )
 
@@ -80,11 +82,14 @@ func (f *Fisherman) resolveTask(ip string) (ti TaskInfo, err error) {
 		return ti, errors.New(fmt.Sprintf("Could not identify exctly on task for '%s': got %v", ip, addrs))
 	}
 	slice := strings.Split(addrs[0], ".")
+	if len(slice) < 3 {
+		err = fmt.Errorf("Hostname should have 3 parts, devided by '.': %v", addrs)
+		f.Log("error", err.Error())
+	}
 	ti.IP = ip
 	ti.ServiceName = slice[0]
 	ti.TaskSlot = slice[1]
 	ti.TaskID = slice[2]
-	ti.NetworkName = slice[3]
 	ti.HostName = fmt.Sprintf("%s.%s.%s", ti.ServiceName, ti.TaskSlot, ti.TaskID)
 	f.Log("debug", fmt.Sprintf("Resolved '%s' to '%s'", ip, ti))
 	return
@@ -130,6 +135,7 @@ func (f *Fisherman) fetchIPs() []string {
 			break
 		}
 	}
+	f.Log("debug",fmt.Sprintf("IPs found for service '%s': %v", srv, ips))
 	return ips
 }
 
