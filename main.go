@@ -204,7 +204,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "Golang library to help fishing information from moby"
 	app.Usage = "go-fishermen [options] <service>"
-	app.Version = "0.0.4"
+	app.Version = "0.0.5"
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "out,o",
